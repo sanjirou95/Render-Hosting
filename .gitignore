@@ -1,4 +1,4 @@
 .env
 venv
-key.json
+cred.json
 __pycache__

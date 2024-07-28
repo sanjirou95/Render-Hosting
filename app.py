@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Firestore DB初期化
-cred = credentials.Certificate('./key.json')
+cred = credentials.Certificate('cred.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -130,13 +130,13 @@ def create_ai_friend():
     }
 
     db.collection('ai_friends').document(friend_id).set(ai_friend_data)
-    
+
     return jsonify({'friend_id': friend_id})
 
 @app.route('/delete', methods=['POST'])
 def delete_ai_friend():
     friend_id = request.json.get('friend_id')
-    
+
     doc_ref = db.collection('ai_friends').document(friend_id)
     if doc_ref.get().exists:
         doc_ref.delete()
@@ -146,16 +146,16 @@ def delete_ai_friend():
 @app.route('/user_info', methods=['POST'])
 def user_info():
     data = request.json
-    
+
     user_data = {
         'name': data['user_name'],
         'relationship': data['relationship'],
         'visit_purpose': data['visit_purpose']
     }
-    
+
     friend_id = data['friend_id']
     db.collection('ai_friends').document(friend_id).collection('user_sessions').document('current_user').set(user_data)
-    
+
     return jsonify({'status': 'success'})
 
 @app.route('/chat', methods=['POST'])
@@ -163,21 +163,21 @@ def chat_with_ai_friend():
     data = request.json
     friend_id = data.get('friend_id')
     user_message = data.get('message')
-    
+
     doc_ref = db.collection('ai_friends').document(friend_id)
     doc = doc_ref.get()
-    
+
     if not doc.exists:
         return jsonify({'status': 'not found'}), 404
-    
+
     ai_friend_data = doc.to_dict()
-    
+
     user_doc_ref = doc_ref.collection('user_sessions').document('current_user')
     user_doc = user_doc_ref.get()
-    
+
     if not user_doc.exists:
         return jsonify({'status': 'user not found'}), 404
-    
+
     user_data = user_doc.to_dict()
 
     # チャット履歴の取得
@@ -201,25 +201,25 @@ def chat_with_ai_friend():
         'message': response,
         'timestamp': firestore.SERVER_TIMESTAMP
     })
-    
+
     return jsonify({'response': response})
 
 @app.route('/delete_chat_history', methods=['POST'])
 def delete_chat_history():
     friend_id = request.json.get('friend_id')
-    
+
     doc_ref = db.collection('ai_friends').document(friend_id)
     chat_history_ref = doc_ref.collection('chat_history')
     chat_history_docs = chat_history_ref.stream()
-    
+
     for doc in chat_history_docs:
         doc.reference.delete()
-    
+
     return jsonify({'status': 'chat history deleted'})
 
 def generate_response(ai_friend_data, user_data, user_message, chat_history):
     openai_api = OpenAI(api_key = openai_api_key)
-    
+
     chat_history_str = '\n'.join([f"{entry['role']}: {entry['message']}" for entry in chat_history])
     prompt = f"あなたは{ai_friend_data['name']}です。\n"
     prompt += f"あなたの情報: {ai_friend_data}\n"
@@ -236,7 +236,7 @@ def generate_response(ai_friend_data, user_data, user_message, chat_history):
     # レスポンスに不要な接頭辞が含まれないようにする。
     if(response.startswith('AIのメッセージ') or response.startswith('AIの応答') or response.startswith('AI自分の名前') or response.startswith(':')):
         response = response[1:]
-    
+
     return response
 
 if __name__ == '__main__':
